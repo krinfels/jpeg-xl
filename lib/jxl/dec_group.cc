@@ -189,8 +189,15 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
              block_rect.xsize() >> hshift[i], block_rect.ysize() >> vshift[i]);
   }
 
+  float *row, *prev_row;
+  row = group_dec_cache->dec_group_row[0];
+  prev_row = group_dec_cache->dec_group_row[1];
+
   for (size_t by = 0; by < ysize_blocks; ++by) {
     get_block->StartRow(by);
+
+    HWY_ALIGN float* block = row;
+
     size_t sby[3] = {by >> vshift[0], by >> vshift[1], by >> vshift[2]};
 
     const int32_t* JXL_RESTRICT row_quant =
@@ -252,7 +259,6 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
         const size_t covered_blocks = 1 << log2_covered_blocks;
         const size_t size = covered_blocks * kDCTBlockSize;
 
-        HWY_ALIGN float* const block = group_dec_cache->dec_group_block;
         JXL_RETURN_IF_ERROR(
             get_block->GetBlock(bx, by, acs, size, log2_covered_blocks, block));
 
@@ -337,8 +343,10 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
           }
         }
         bx += llf_x;
+	block += 3 * size;
       }
     }
+    std::swap(row, prev_row);
   }
   // Apply image features to
   // - the whole AC group, if no loop filtering is enabled, or
@@ -604,7 +612,7 @@ Status DecodeGroup(BitReader* JXL_RESTRICT* JXL_RESTRICT readers,
   PROFILER_FUNC;
   const Rect block_group_rect = dec_state->shared->BlockGroupRect(group_idx);
 
-  group_dec_cache->InitOnce(num_passes);
+  group_dec_cache->InitOnce(num_passes, block_group_rect.xsize());
 
   size_t histo_selector_bits =
       CeilLog2Nonzero(dec_state->shared->num_histograms);
@@ -618,6 +626,7 @@ Status DecodeGroup(BitReader* JXL_RESTRICT* JXL_RESTRICT readers,
                                       thread, block_group_rect, aux_out, output,
                                       decoded));
 
+  group_dec_cache->DeInit();
   for (size_t pass = 0; pass < num_passes; pass++) {
     if (!get_block.decoders[pass].CheckANSFinalState()) {
       return JXL_FAILURE("ANS checksum failure.");
