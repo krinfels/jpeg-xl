@@ -21,6 +21,8 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <iomanip>
+#include <iostream>
 #include <limits>
 #include <numeric>
 #include <vector>
@@ -742,6 +744,7 @@ class LossyFrameEncoder {
 
     float* JXL_RESTRICT previous_row_predictions = new float[64 * xsize_blocks];
     float* JXL_RESTRICT current_row_predictions = new float[64 * xsize_blocks];
+    memset(current_row_predictions, 0, 64 * xsize_blocks);
 
     for (size_t c : {1, 0, 2}) {
       if (jpeg_data.components.size() == 1 && c != 1) {
@@ -761,7 +764,7 @@ class LossyFrameEncoder {
         const size_t gy = group_index / frame_dim.xsize_groups;
         size_t offset = 0;
         float* JXL_RESTRICT ac = enc_state_->coeffs[0].PlaneRow(c, group_index);
-        size_t row_size = std::min(xsize_blocks, (gx+1) * kGroupDimInBlocks);
+        const size_t row_size = std::min(xsize_blocks, (gx+1) * kGroupDimInBlocks);
 
         for (size_t by = gy * kGroupDimInBlocks;
              by < ysize_blocks && by < (gy + 1) * kGroupDimInBlocks; ++by) {
@@ -812,27 +815,51 @@ class LossyFrameEncoder {
                 }
               }
             }
-            if (frame_header->chroma_subsampling.Is444()) {
-              const float* top_ac =
-                  by > 0 ? ac + offset - row_size * 64 : nullptr;
-              const float* left_ac =
-                  bx > 0 ? ac + offset - 64 : nullptr;
-              predict(current_row_predictions + bx*64, top_ac, left_ac, false);
+            if (c == 1) {
+              std::cout << offset / 64 << "th block (c=" << c
+                        << ", values):\n";
+              for (size_t y = 0; y < 8; y++) {
+                for (size_t x = 0; x < 8; x++) {
+                  std::cout << std::setw(8) << ac[offset + y * 8 + x];
+                  if (x == 7) std::cout << std::endl;
+                }
+              }
+            }
+            const float* top_ac = by > 0 ? ac + offset - row_size * 64 : nullptr;
+            const float* left_ac = bx > 0 ? ac + offset - 64 : nullptr;
+            float* const predictions = current_row_predictions + bx * 64;
+            individual_project::predict(predictions, top_ac, left_ac, false);
+            if (c == 1) {
+              std::cout << offset / 64 << "th block (c=" << c
+                        << ", predictions):\n";
+              for (size_t y = 0; y < 8; y++) {
+                for (size_t x = 0; x < 8; x++) {
+                  std::cout << std::setw(8) << predictions[y * 8 + x];
+                  if (x == 7) std::cout << std::endl;
+                }
+              }
             }
             offset += 64;
           }
+
           if (by > 0) {
-            applyPrediction(ac + offset - row_size*64,
-                            previous_row_predictions, row_size);
+            individual_project::applyPrediction(ac + (by - 1) * row_size * 64,
+                                                previous_row_predictions,
+                                                row_size);
           }
           std::swap(current_row_predictions, previous_row_predictions);
-          memset(current_row_predictions, 0, row_size);
+          memset(current_row_predictions, 0, 64 * xsize_blocks);
         }
-        applyPrediction(ac + offset - row_size*64, previous_row_predictions, row_size);
+        individual_project::applyPrediction(ac + offset - row_size * 64,
+                                            previous_row_predictions, row_size);
       }
     }
     delete [] previous_row_predictions;
     delete [] current_row_predictions;
+
+    if (!frame_header->chroma_subsampling.Is444()) {
+      std::cout << "chroma_subsampling is on!" << std::endl;
+    }
 
     auto& dct = enc_state_->shared.block_ctx_map.dc_thresholds;
     auto& num_dc_ctxs = enc_state_->shared.block_ctx_map.num_dc_ctxs;

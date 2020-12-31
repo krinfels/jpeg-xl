@@ -1,44 +1,55 @@
 #ifndef JPEGXL_AC_JPEG_PREDICT_H
 #define JPEGXL_AC_JPEG_PREDICT_H
 
-void predict(float* ac, const float* top_ac, const float* left_ac, bool inplace) {
+namespace individual_project {
+
+void predict(float* ac, const float* top_ac, const float* left_ac,
+             bool inplace) {
   if (top_ac == nullptr && left_ac == nullptr) {
     return;
   }
-  
+
   for (size_t y = 0; y < 8; y++) {
     for (size_t x = 0; x < 8; x++) {
       if (x == 0 && y == 0) {
         continue;
       }
 
-      int index = x * 8 + y;
+      const size_t idx = y * 8 + x;
       float prediction;
 
       if (left_ac == nullptr) {
-        prediction = top_ac[index];
+        prediction = top_ac[idx];
       } else if (top_ac == nullptr) {
-        prediction = left_ac[index];
+        prediction = left_ac[idx];
       } else {
-        prediction = (top_ac[index] + left_ac[index]) / 2;
+        prediction = (top_ac[idx] + left_ac[idx]) / 2;
       }
 
       if (inplace) {
-        ac[index] += prediction;
+        ac[idx] += prediction;
       } else {
-        ac[index] = prediction;
+        ac[idx] = prediction;
       }
     }
   }
 }
 
-void applyPrediction(float* ac, const float* top_ac, size_t row_size) {
-
+void applyPrediction(float* ac, const float* predictions, size_t row_size) {
+  const size_t INDEX_BOUND = 8;
   for (size_t i = 0; i < row_size; i++) {
-    for (size_t j = 1; j < 64; j++) {
-      ac[64 * i + j] -= top_ac[64 * i + j];
+    for (size_t y = 0; y < INDEX_BOUND; y++) {
+      for (size_t x = 0; x < INDEX_BOUND; x++) {
+        if (x == 0 && y == 0) {
+          continue;
+        }
+        const size_t idx = y * 8 + x;
+        ac[64 * i + idx] -= predictions[64 * i + idx];
+      }
     }
   }
 }
+
+}  // namespace individual_project
 
 #endif  // JPEGXL_AC_JPEG_PREDICT_H

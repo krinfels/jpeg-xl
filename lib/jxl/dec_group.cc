@@ -26,6 +26,8 @@
 #define HWY_TARGET_INCLUDE "lib/jxl/dec_group.cc"
 #include <hwy/foreach_target.h>
 #include <hwy/highway.h>
+#include <iomanip>
+#include <iostream>
 
 #include "lib/jxl/ac_context.h"
 #include "lib/jxl/ac_strategy.h"
@@ -261,6 +263,18 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
 
         JXL_RETURN_IF_ERROR(
             get_block->GetBlock(bx, by, acs, size, log2_covered_blocks, block));
+
+        for (int c : {1, 0 ,2}) {
+          if (c == 1) {
+            std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c << "):\n";
+            for (size_t y = 0; y < 8; y++) {
+              for (size_t x = 0; x < 8; x++) {
+                std::cout << std::setw(5) << block[c * 64 + y * 8 + x];
+                if (x == 7) std::cout << std::endl;
+              }
+            }
+          }
+        }
 
         if (JXL_UNLIKELY(decoded->IsJPEG())) {
           if (acs.Strategy() != AcStrategy::Type::DCT) {

@@ -14,6 +14,9 @@
 
 #include "lib/jxl/entropy_coder.h"
 
+#include <experimental/iterator>
+#include <iostream>
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -25,6 +28,7 @@
 #define HWY_TARGET_INCLUDE "lib/jxl/entropy_coder.cc"
 #include <hwy/foreach_target.h>
 #include <hwy/highway.h>
+#include <iterator>
 
 #include "lib/jxl/ac_context.h"
 #include "lib/jxl/ac_strategy.h"
@@ -207,6 +211,10 @@ void TokenizeCoefficients(const coeff_order_t* JXL_RESTRICT orders,
           Num0BitsBelowLS1Bit_Nonzero(covered_blocks);
       const size_t size = covered_blocks * kDCTBlockSize;
 
+//      std::cerr << "Order (size="  << size << "):" << std::endl;
+//      std::copy(orders, orders + size, std::ostream_iterator<int>(std::cerr, ", ") );
+//      std::cerr << std::endl;
+
       CoefficientLayout(&cy, &cx);  // swap cx/cy to canonical order
 
       for (int c : {1, 0, 2}) {
@@ -232,12 +240,22 @@ void TokenizeCoefficients(const coeff_order_t* JXL_RESTRICT orders,
         const int32_t nzero_ctx =
             block_ctx_map.NonZeroContext(predicted_nzeros, block_ctx);
 
+        // calc dct up and left pointers
+
         output->emplace_back(nzero_ctx, nzeros);
         const size_t histo_offset =
             block_ctx_map.ZeroDensityContextsOffset(block_ctx);
         // Skip LLF.
         size_t prev = (nzeros > static_cast<ssize_t>(size / 16) ? 0 : 1);
         for (size_t k = covered_blocks; k < size && nzeros != 0; ++k) {
+
+//          int32_t left = 0;
+//          if (bx != 0) {
+//            const ac_qcoeff_t* JXL_RESTRICT left_block = ac_rows[c] - size;
+//            left = static_cast<int32_t>(left_block[order[k]]);
+//          }
+//          std::cerr << "Derived left: " << left << std::endl;
+
           int32_t coeff = static_cast<int32_t>(block[order[k]]);
           size_t ctx =
               histo_offset + ZeroDensityContext(nzeros, k, covered_blocks,
