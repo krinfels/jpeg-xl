@@ -809,9 +809,7 @@ class LossyFrameEncoder {
 
               float* top_ac = bx > 0 ? ac - ysize_blocks * 64 : nullptr;
               float* left_ac = by > 0 ? ac - 64 : nullptr;
-              ac[offset + 0 * 8 + 1] = predict(ac, top_ac, left_ac, 0, 1);
-              ac[offset + 1 * 8 + 1] = predict(ac, top_ac, left_ac, 1, 1);
-              ac[offset + 1 * 8 + 0] = predict(ac, top_ac, left_ac, 1, 0);
+              predict(ac, top_ac, left_ac, /* is_decoding */ false);
             }
             offset += 64;
           }

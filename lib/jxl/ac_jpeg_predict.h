@@ -1,17 +1,34 @@
 #ifndef JPEGXL_AC_JPEG_PREDICT_H
 #define JPEGXL_AC_JPEG_PREDICT_H
 
-float predict(float* const ac, float* const top_ac, float* const left_ac, int x,
-              int y) {
-  int index = x * 8 + y;
+void predict(float* ac, const float* top_ac, const float* left_ac, bool is_decoding) {
   if (top_ac == nullptr && left_ac == nullptr) {
-    return ac[index];
-  } else if (left_ac == nullptr) {
-    return top_ac[index];
-  } else if (top_ac == nullptr) {
-    return left_ac[index];
-  } else {
-    return (top_ac[index] + left_ac[index]) / 2;
+    return;
+  }
+  
+  for (size_t y = 0; y < 8; y++) {
+    for (size_t x = 0; x < 8; x++) {
+      if (x == 0 && y == 0) {
+        continue;
+      }
+
+      int index = x * 8 + y;
+      float prediction;
+
+      if (left_ac == nullptr) {
+        prediction = top_ac[index];
+      } else if (top_ac == nullptr) {
+        prediction = left_ac[index];
+      } else {
+        prediction = (top_ac[index] + left_ac[index]) / 2;
+      }
+
+      if (is_decoding) {
+        ac[index] += prediction;
+      } else {
+        ac[index] -= prediction;
+      }
+    }
   }
 }
 
