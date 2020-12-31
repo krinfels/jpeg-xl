@@ -25,6 +25,7 @@
 #include <numeric>
 #include <vector>
 
+#include "ac_jpeg_predict.h"
 #include "lib/jxl/ac_context.h"
 #include "lib/jxl/ac_strategy.h"
 #include "lib/jxl/ans_params.h"
@@ -561,20 +562,6 @@ class LossyFrameEncoder {
 
     *frame_header = shared.frame_header;
     return true;
-  }
-
-  float predict(float* const ac, float* const top_ac, float* const left_ac,
-                int x, int y) {
-    int index = x * 8 + y;
-    if (top_ac == nullptr && left_ac == nullptr) {
-      return ac[index];
-    } else if (top_ac == nullptr) {
-      return top_ac[index];
-    } else if (left_ac == nullptr) {
-      return left_ac[index];
-    } else {
-      return (top_ac[index] + left_ac[index]) / 2;
-    }
   }
 
   Status ComputeJPEGTranscodingData(const jpeg::JPEGData& jpeg_data,
