@@ -563,6 +563,20 @@ class LossyFrameEncoder {
     return true;
   }
 
+  float predict(float* const ac, float* const top_ac, float* const left_ac,
+                int x, int y) {
+    int index = x * 8 + y;
+    if (top_ac == nullptr && left_ac == nullptr) {
+      return ac[index];
+    } else if (top_ac == nullptr) {
+      return top_ac[index];
+    } else if (left_ac == nullptr) {
+      return left_ac[index];
+    } else {
+      return (top_ac[index] + left_ac[index]) / 2;
+    }
+  }
+
   Status ComputeJPEGTranscodingData(const jpeg::JPEGData& jpeg_data,
                                     ModularFrameEncoder* modular_frame_encoder,
                                     FrameHeader* frame_header) {
@@ -805,6 +819,12 @@ class LossyFrameEncoder {
                   ac[offset + y * 8 + x] = QCR;
                 }
               }
+
+              float* top_ac = bx > 0 ? ac - ysize_blocks * 64 : nullptr;
+              float* left_ac = by > 0 ? ac - 64 : nullptr;
+              ac[offset + 0 * 8 + 1] = predict(ac, top_ac, left_ac, 0, 1);
+              ac[offset + 1 * 8 + 1] = predict(ac, top_ac, left_ac, 1, 1);
+              ac[offset + 1 * 8 + 0] = predict(ac, top_ac, left_ac, 1, 0);
             }
             offset += 64;
           }
