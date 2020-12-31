@@ -739,6 +739,10 @@ class LossyFrameEncoder {
     dc_counts[1].resize(2048);
     dc_counts[2].resize(2048);
     size_t total_dc[3] = {};
+
+    float* JXL_RESTRICT previous_row_predictions = new float[64 * ysize_blocks];
+    float* JXL_RESTRICT current_row_predictions = new float[64 * ysize_blocks];
+
     for (size_t c : {1, 0, 2}) {
       if (jpeg_data.components.size() == 1 && c != 1) {
         ZeroFillImage(&enc_state_->coeffs[0].Plane(c));
@@ -757,6 +761,7 @@ class LossyFrameEncoder {
         const size_t gy = group_index / frame_dim.xsize_groups;
         size_t offset = 0;
         float* JXL_RESTRICT ac = enc_state_->coeffs[0].PlaneRow(c, group_index);
+
         for (size_t by = gy * kGroupDimInBlocks;
              by < ysize_blocks && by < (gy + 1) * kGroupDimInBlocks; ++by) {
           if ((by >> vshift) << vshift != by) continue;
@@ -783,7 +788,8 @@ class LossyFrameEncoder {
                 !frame_header->chroma_subsampling.Is444()) {
               for (size_t y = 0; y < 8; y++) {
                 for (size_t x = 0; x < 8; x++) {
-                  ac[offset + y * 8 + x] = inputjpeg[base + x * 8 + y];
+                  ac[offset + y * 8 + x] =
+                      current_row_predictions[offset + y * 8 + x] = inputjpeg[base + x * 8 + y];
                 }
               }
             } else {
@@ -807,15 +813,20 @@ class LossyFrameEncoder {
                 }
               }
 
-              float* top_ac = bx > 0 ? ac - ysize_blocks * 64 : nullptr;
-              float* left_ac = by > 0 ? ac - 64 : nullptr;
-              predict(ac, top_ac, left_ac, /* is_decoding */ false);
+              const float* top_ac = bx > 0 ? previous_row_predictions + offset : nullptr;
+              const float* left_ac = by > 0 ? current_row_predictions + offset - 64 : nullptr;
+              predict(current_row_predictions, top_ac, left_ac, /* is_decoding */ false);
             }
             offset += 64;
           }
+          applyPrediction(ac, previous_row_predictions, ysize_blocks);
+          std::swap(current_row_predictions, previous_row_predictions);
         }
       }
     }
+    // TODO: apply last prediction?
+    delete [] previous_row_predictions;
+    delete [] current_row_predictions;
 
     auto& dct = enc_state_->shared.block_ctx_map.dc_thresholds;
     auto& num_dc_ctxs = enc_state_->shared.block_ctx_map.num_dc_ctxs;

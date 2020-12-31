@@ -1,7 +1,7 @@
 #ifndef JPEGXL_AC_JPEG_PREDICT_H
 #define JPEGXL_AC_JPEG_PREDICT_H
 
-void predict(float* ac, const float* top_ac, const float* left_ac, bool is_decoding) {
+void predict(float* ac, const float* top_ac, const float* left_ac, bool inplace) {
   if (top_ac == nullptr && left_ac == nullptr) {
     return;
   }
@@ -23,13 +23,17 @@ void predict(float* ac, const float* top_ac, const float* left_ac, bool is_decod
         prediction = (top_ac[index] + left_ac[index]) / 2;
       }
 
-      if (is_decoding) {
+      if (inplace) {
         ac[index] += prediction;
       } else {
-        ac[index] -= prediction;
+        ac[index] = prediction;
       }
     }
   }
+}
+
+void applyPrediction(float* ac, const float* top_ac, size_t ysize_block) {
+  // TODO
 }
 
 #endif  // JPEGXL_AC_JPEG_PREDICT_H
