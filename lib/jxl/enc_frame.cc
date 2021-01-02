@@ -740,8 +740,8 @@ class LossyFrameEncoder {
     dc_counts[2].resize(2048);
     size_t total_dc[3] = {};
 
-    float* JXL_RESTRICT previous_row_predictions = new float[64 * ysize_blocks];
-    float* JXL_RESTRICT current_row_predictions = new float[64 * ysize_blocks];
+    float* JXL_RESTRICT previous_row_predictions = new float[64 * xsize_blocks];
+    float* JXL_RESTRICT current_row_predictions = new float[64 * xsize_blocks];
 
     for (size_t c : {1, 0, 2}) {
       if (jpeg_data.components.size() == 1 && c != 1) {
@@ -761,6 +761,7 @@ class LossyFrameEncoder {
         const size_t gy = group_index / frame_dim.xsize_groups;
         size_t offset = 0;
         float* JXL_RESTRICT ac = enc_state_->coeffs[0].PlaneRow(c, group_index);
+        size_t row_size = std::min(xsize_blocks, (gx+1) * kGroupDimInBlocks);
 
         for (size_t by = gy * kGroupDimInBlocks;
              by < ysize_blocks && by < (gy + 1) * kGroupDimInBlocks; ++by) {
@@ -770,8 +771,7 @@ class LossyFrameEncoder {
           float* JXL_RESTRICT fdc = dc.PlaneRow(c, by >> vshift);
           const int8_t* JXL_RESTRICT cm =
               map.ConstRow(by / kColorTileDimInBlocks);
-          for (size_t bx = gx * kGroupDimInBlocks;
-               bx < xsize_blocks && bx < (gx + 1) * kGroupDimInBlocks; ++bx) {
+          for (size_t bx = gx * kGroupDimInBlocks; bx < row_size; ++bx) {
             if ((bx >> hshift) << hshift != bx) continue;
             size_t base = (bx >> hshift) * kDCTBlockSize;
             int idc;
@@ -788,8 +788,7 @@ class LossyFrameEncoder {
                 !frame_header->chroma_subsampling.Is444()) {
               for (size_t y = 0; y < 8; y++) {
                 for (size_t x = 0; x < 8; x++) {
-                  ac[offset + y * 8 + x] =
-                      current_row_predictions[offset + y * 8 + x] = inputjpeg[base + x * 8 + y];
+                  ac[offset + y * 8 + x] = inputjpeg[base + x * 8 + y];
                 }
               }
             } else {
@@ -812,19 +811,26 @@ class LossyFrameEncoder {
                   ac[offset + y * 8 + x] = QCR;
                 }
               }
-
-              const float* top_ac = bx > 0 ? previous_row_predictions + offset : nullptr;
-              const float* left_ac = by > 0 ? current_row_predictions + offset - 64 : nullptr;
-              predict(current_row_predictions, top_ac, left_ac, /* is_decoding */ false);
+            }
+            if (frame_header->chroma_subsampling.Is444()) {
+              const float* top_ac =
+                  by > 0 ? ac + offset - row_size * 64 : nullptr;
+              const float* left_ac =
+                  bx > 0 ? ac + offset - 64 : nullptr;
+              predict(current_row_predictions + bx*64, top_ac, left_ac, false);
             }
             offset += 64;
           }
-          applyPrediction(ac, previous_row_predictions, ysize_blocks);
+          if (by > 0) {
+            applyPrediction(ac + offset - row_size*64,
+                            previous_row_predictions, row_size);
+          }
           std::swap(current_row_predictions, previous_row_predictions);
+          memset(current_row_predictions, 0, row_size);
         }
+        applyPrediction(ac + offset - row_size*64, previous_row_predictions, row_size);
       }
     }
-    // TODO: apply last prediction?
     delete [] previous_row_predictions;
     delete [] current_row_predictions;
 

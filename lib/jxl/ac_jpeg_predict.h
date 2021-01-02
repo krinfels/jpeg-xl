@@ -32,8 +32,13 @@ void predict(float* ac, const float* top_ac, const float* left_ac, bool inplace)
   }
 }
 
-void applyPrediction(float* ac, const float* top_ac, size_t ysize_block) {
-  // TODO
+void applyPrediction(float* ac, const float* top_ac, size_t row_size) {
+
+  for (size_t i = 0; i < row_size; i++) {
+    for (size_t j = 1; j < 64; j++) {
+      ac[64 * i + j] -= top_ac[64 * i + j];
+    }
+  }
 }
 
 #endif  // JPEGXL_AC_JPEG_PREDICT_H
