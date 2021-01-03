@@ -71,6 +71,8 @@
 #include "lib/jxl/splines.h"
 #include "lib/jxl/toc.h"
 
+#include <cassert>
+
 namespace jxl {
 namespace {
 
@@ -741,10 +743,11 @@ class LossyFrameEncoder {
     dc_counts[1].resize(2048);
     dc_counts[2].resize(2048);
     size_t total_dc[3] = {};
+    const size_t row_size = std::min(xsize_blocks, kGroupDimInBlocks);
 
-    float* JXL_RESTRICT previous_row_predictions = new float[64 * xsize_blocks];
-    float* JXL_RESTRICT current_row_predictions = new float[64 * xsize_blocks];
-    memset(current_row_predictions, 0, 64 * xsize_blocks);
+    float* JXL_RESTRICT previous_row_predictions = new float[64 * row_size];
+    float* JXL_RESTRICT current_row_predictions = new float[64 * row_size];
+    memset(current_row_predictions, 0, 64);
 
     for (size_t c : {1, 0, 2}) {
       if (jpeg_data.components.size() == 1 && c != 1) {
@@ -764,7 +767,6 @@ class LossyFrameEncoder {
         const size_t gy = group_index / frame_dim.xsize_groups;
         size_t offset = 0;
         float* JXL_RESTRICT ac = enc_state_->coeffs[0].PlaneRow(c, group_index);
-        const size_t row_size = std::min(xsize_blocks, (gx+1) * kGroupDimInBlocks);
 
         for (size_t by = gy * kGroupDimInBlocks;
              by < ysize_blocks && by < (gy + 1) * kGroupDimInBlocks; ++by) {
@@ -774,7 +776,8 @@ class LossyFrameEncoder {
           float* JXL_RESTRICT fdc = dc.PlaneRow(c, by >> vshift);
           const int8_t* JXL_RESTRICT cm =
               map.ConstRow(by / kColorTileDimInBlocks);
-          for (size_t bx = gx * kGroupDimInBlocks; bx < row_size; ++bx) {
+          for (size_t bx = gx * kGroupDimInBlocks;
+               bx < xsize_blocks && bx < (gx+1) * kGroupDimInBlocks; ++bx) {
             if ((bx >> hshift) << hshift != bx) continue;
             size_t base = (bx >> hshift) * kDCTBlockSize;
             int idc;
@@ -815,6 +818,7 @@ class LossyFrameEncoder {
                 }
               }
             }
+#ifdef DEBUG
             if (c == 1) {
               std::cout << offset / 64 << "th block (c=" << c
                         << ", values):\n";
@@ -825,10 +829,12 @@ class LossyFrameEncoder {
                 }
               }
             }
+#endif
             const float* top_ac = by > 0 ? ac + offset - row_size * 64 : nullptr;
             const float* left_ac = bx > 0 ? ac + offset - 64 : nullptr;
-            float* const predictions = current_row_predictions + bx * 64;
+            float* const predictions = current_row_predictions + (bx - gx*kGroupDimInBlocks) * 64;
             individual_project::predict(predictions, top_ac, left_ac, false);
+#ifdef DEBUG
             if (c == 1) {
               std::cout << offset / 64 << "th block (c=" << c
                         << ", predictions):\n";
@@ -839,16 +845,15 @@ class LossyFrameEncoder {
                 }
               }
             }
+#endif
             offset += 64;
           }
-
           if (by > 0) {
-            individual_project::applyPrediction(ac + (by - 1) * row_size * 64,
+            individual_project::applyPrediction(ac + offset - 2 * row_size * 64,
                                                 previous_row_predictions,
                                                 row_size);
           }
           std::swap(current_row_predictions, previous_row_predictions);
-          memset(current_row_predictions, 0, 64 * xsize_blocks);
         }
         individual_project::applyPrediction(ac + offset - row_size * 64,
                                             previous_row_predictions, row_size);
