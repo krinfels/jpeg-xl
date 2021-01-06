@@ -251,7 +251,7 @@ set(JPEGXL_INTERNAL_SOURCES
   jxl/transpose-inl.h
   jxl/xorshift128plus-inl.h
   jxl/ac_jpeg_predict.h
-)
+        jxl/ac_jpeg_predict.cc)
 
 set(JPEGXL_INTERNAL_LIBS
   brotlicommon-static
