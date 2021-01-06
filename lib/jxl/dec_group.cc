@@ -29,6 +29,7 @@
 #include <iomanip>
 #include <iostream>
 
+#include "ac_jpeg_predict.h"
 #include "lib/jxl/ac_context.h"
 #include "lib/jxl/ac_strategy.h"
 #include "lib/jxl/aux_out.h"
@@ -198,7 +199,7 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
   for (size_t by = 0; by < ysize_blocks; ++by) {
     get_block->StartRow(by);
 
-    HWY_ALIGN float* block = row;
+    size_t offset = 0;
 
     size_t sby[3] = {by >> vshift[0], by >> vshift[1], by >> vshift[2]};
 
@@ -262,21 +263,24 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
         const size_t size = covered_blocks * kDCTBlockSize;
 
         JXL_RETURN_IF_ERROR(
-            get_block->GetBlock(bx, by, acs, size, log2_covered_blocks, block));
+            get_block->GetBlock(bx, by, acs, size, log2_covered_blocks, row+offset));
 
-#ifdef DEBUG
+        float *left_ac = bx > 0 ? row + offset - 3*size : nullptr;
+        float *top_ac = by > 0 ? prev_row + offset  : nullptr;
+
+        individual_project::predict(row+offset, left_ac, top_ac, true);
+
         for(int c : {1, 0 ,2}) {
           if (c == 1) {
             std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c << "):\n";
             for (size_t y = 0; y < 8; y++) {
               for (size_t x = 0; x < 8; x++) {
-                std::cout << std::setw(8) << block[c * 64 + y * 8 + x];
+                std::cout << std::setw(8) << row[offset + c * 64 + y * 8 + x];
                 if (x == 7) std::cout << std::endl;
               }
             }
           }
         }
-#endif
 
         if (JXL_UNLIKELY(decoded->IsJPEG())) {
           if (acs.Strategy() != AcStrategy::Type::DCT) {
@@ -296,7 +300,7 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
                 jpeg_row[c] + sbx[c] * kDCTBlockSize;
             // JPEG XL is transposed, JPEG is not.
             HWY_ALIGN float transposed_dct[64];
-            Transpose<8, 8>::Run(DCTFrom(block + c * size, 8),
+            Transpose<8, 8>::Run(DCTFrom(row + offset + c * size, 8),
                                  DCTTo(transposed_dct, 8));
             // No CfL - no need to store the block converted to integers.
             if (!cs.Is444() ||
@@ -344,7 +348,7 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
                          dec_state->shared->quantizer, dequant_matrices,
                          acs.covered_blocks_y() * acs.covered_blocks_x(), sbx,
                          dc_rows, dc_stride,
-                         dec_state->shared->opsin_params.quant_biases, block);
+                         dec_state->shared->opsin_params.quant_biases, row + offset);
           }
 
           for (size_t c : {1, 0, 2}) {
@@ -354,12 +358,12 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
             // IDCT
             float* JXL_RESTRICT idct_pos =
                 idct_row[c] + dec_state->decoded_padding + sbx[c] * kBlockDim;
-            TransformToPixels(acs.Strategy(), block + c * size, idct_pos,
+            TransformToPixels(acs.Strategy(), row + offset + c * size, idct_pos,
                               idct_stride, group_dec_cache->scratch_space);
           }
         }
         bx += llf_x;
-	block += 3 * size;
+	offset += 3 * size;
       }
     }
     std::swap(row, prev_row);
