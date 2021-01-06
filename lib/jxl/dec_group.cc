@@ -269,7 +269,7 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
             std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c << "):\n";
             for (size_t y = 0; y < 8; y++) {
               for (size_t x = 0; x < 8; x++) {
-                std::cout << std::setw(5) << block[c * 64 + y * 8 + x];
+                std::cout << std::setw(8) << block[c * 64 + y * 8 + x];
                 if (x == 7) std::cout << std::endl;
               }
             }

@@ -1,17 +1,13 @@
 #ifndef JPEGXL_AC_JPEG_PREDICT_H
 #define JPEGXL_AC_JPEG_PREDICT_H
 
-#include <cassert>
-
 namespace individual_project {
 
 void predict(float* ac, const float* top_ac, const float* left_ac,
-             bool inplace, size_t pos) {
-#if 0
+             bool inplace) {
   if (top_ac == nullptr && left_ac == nullptr) {
     return;
   }
-#endif
 
   for (size_t y = 0; y < 8; y++) {
     for (size_t x = 0; x < 8; x++) {
@@ -20,9 +16,8 @@ void predict(float* ac, const float* top_ac, const float* left_ac,
       }
 
       const size_t idx = y * 8 + x;
-//      float prediction;
+      float prediction;
 
-#if 0
       if (left_ac == nullptr) {
         prediction = top_ac[idx];
       } else if (top_ac == nullptr) {
@@ -30,20 +25,18 @@ void predict(float* ac, const float* top_ac, const float* left_ac,
       } else {
         prediction = (top_ac[idx] + left_ac[idx]) / 2;
       }
-#endif
 
       if (inplace) {
-     //   ac[idx] += prediction;
+        ac[idx] += prediction;
       } else {
-        //ac[idx] = prediction;
-        ac[idx] = pos + idx;
+        ac[idx] = prediction;
       }
     }
 
   }
 }
 
-void applyPrediction(float* ac, const float* predictions, size_t row_size, size_t pos) {
+void applyPrediction(float* ac, const float* predictions, size_t row_size) {
   const size_t INDEX_BOUND = 8;
   for (size_t i = 0; i < row_size; i++) {
     for (size_t y = 0; y < INDEX_BOUND; y++) {
@@ -52,7 +45,6 @@ void applyPrediction(float* ac, const float* predictions, size_t row_size, size_
           continue;
         }
         const size_t idx = y * 8 + x;
-        assert(predictions[64*i+idx] == idx + pos + i*64);
         ac[64 * i + idx] -= predictions[64 * i + idx];
       }
     }
