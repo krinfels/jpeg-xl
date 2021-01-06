@@ -818,7 +818,6 @@ class LossyFrameEncoder {
                 }
               }
             }
-#define DEBUG 1
 #ifdef DEBUG
             if (c == 1) {
               std::cout << offset / 64 << "th block (c=" << c
@@ -831,13 +830,13 @@ class LossyFrameEncoder {
               }
             }
 #endif
-            const float* top_ac = by > 0 ? ac + offset - row_size * 64 : nullptr;
-            const float* left_ac = bx > 0 ? ac + offset - 64 : nullptr;
+            const float* top_ac = by > gy*kGroupDimInBlocks ? ac + offset - row_size * 64 : nullptr;
+            const float* left_ac = bx > gx*kGroupDimInBlocks ? ac + offset - 64 : nullptr;
             float* const predictions = current_row_predictions + (bx - gx*kGroupDimInBlocks) * 64;
             individual_project::predict(predictions, top_ac, left_ac, false);
             offset += 64;
           }
-          if (by > 0) {
+          if (by > gy*kGroupDimInBlocks) {
             individual_project::applyPrediction(ac + offset - 2 * row_size * 64,
                                                 previous_row_predictions,
                                                 row_size);
