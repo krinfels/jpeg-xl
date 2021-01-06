@@ -262,24 +262,30 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
         const size_t covered_blocks = 1 << log2_covered_blocks;
         const size_t size = covered_blocks * kDCTBlockSize;
 
-        JXL_RETURN_IF_ERROR(
-            get_block->GetBlock(bx, by, acs, size, log2_covered_blocks, row+offset));
+        JXL_RETURN_IF_ERROR(get_block->GetBlock(
+            bx, by, acs, size, log2_covered_blocks, row + offset));
 
-        float *left_ac = bx > 0 ? row + offset - 3*size : nullptr;
-        float *top_ac = by > 0 ? prev_row + offset  : nullptr;
-
-        individual_project::predict(row+offset, left_ac, top_ac, true);
-
-        for(int c : {1, 0 ,2}) {
+        for (int c : {1, 0, 2}) {
+          float* left_ac = bx > 0 ? row + offset + (c - 3) * 64 : nullptr;
+          float* top_ac = by > 0 ? prev_row + offset + (c * 64) : nullptr;
+          individual_project::predict(row + offset + (c * 64), top_ac, left_ac,
+                                      true);
+#ifdef DEBUG
           if (c == 1) {
-            std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c << "):\n";
+            std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c
+                      << ", values):\n";
             for (size_t y = 0; y < 8; y++) {
               for (size_t x = 0; x < 8; x++) {
-                std::cout << std::setw(8) << row[offset + c * 64 + y * 8 + x];
+                if (x == 0 && y == 0) {
+                  std::cout << std::setw(8) << dc_rows[c][sbx[c]] - dcoff[c];
+                } else {
+                  std::cout << std::setw(8) << row[offset + c * 64 + y * 8 + x];
+                }
                 if (x == 7) std::cout << std::endl;
               }
             }
           }
+#endif
         }
 
         if (JXL_UNLIKELY(decoded->IsJPEG())) {

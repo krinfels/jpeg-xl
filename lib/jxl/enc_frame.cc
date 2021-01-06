@@ -743,10 +743,10 @@ class LossyFrameEncoder {
     dc_counts[1].resize(2048);
     dc_counts[2].resize(2048);
     size_t total_dc[3] = {};
-    const size_t row_size = std::min(xsize_blocks, kGroupDimInBlocks);
-
-    float* JXL_RESTRICT previous_row_predictions = new float[64 * row_size];
-    float* JXL_RESTRICT current_row_predictions = new float[64 * row_size];
+    float* JXL_RESTRICT previous_row_predictions =
+        new float[64 * kGroupDimInBlocks];
+    float* JXL_RESTRICT current_row_predictions =
+        new float[64 * kGroupDimInBlocks];
     memset(current_row_predictions, 0, 64);
 
     for (size_t c : {1, 0, 2}) {
@@ -768,6 +768,9 @@ class LossyFrameEncoder {
         size_t offset = 0;
         float* JXL_RESTRICT ac = enc_state_->coeffs[0].PlaneRow(c, group_index);
 
+        const size_t row_size =
+            std::min(xsize_blocks, (gx + 1) * kGroupDimInBlocks) -
+            gx * kGroupDimInBlocks;
         for (size_t by = gy * kGroupDimInBlocks;
              by < ysize_blocks && by < (gy + 1) * kGroupDimInBlocks; ++by) {
           if ((by >> vshift) << vshift != by) continue;
@@ -777,7 +780,7 @@ class LossyFrameEncoder {
           const int8_t* JXL_RESTRICT cm =
               map.ConstRow(by / kColorTileDimInBlocks);
           for (size_t bx = gx * kGroupDimInBlocks;
-               bx < xsize_blocks && bx < (gx+1) * kGroupDimInBlocks; ++bx) {
+               bx < xsize_blocks && bx < (gx + 1) * kGroupDimInBlocks; ++bx) {
             if ((bx >> hshift) << hshift != bx) continue;
             size_t base = (bx >> hshift) * kDCTBlockSize;
             int idc;
@@ -836,15 +839,15 @@ class LossyFrameEncoder {
             individual_project::predict(predictions, top_ac, left_ac, false);
             offset += 64;
           }
-          if (by > gy*kGroupDimInBlocks) {
+          if (by > gy * kGroupDimInBlocks) {
             individual_project::applyPrediction(ac + offset - 2 * row_size * 64,
                                                 previous_row_predictions,
                                                 row_size);
           }
           std::swap(current_row_predictions, previous_row_predictions);
         }
-        individual_project::applyPrediction(
-            ac + offset - row_size * 64, previous_row_predictions, row_size);
+        individual_project::applyPrediction(ac + offset - row_size * 64,
+                                            previous_row_predictions, row_size);
       }
     }
     delete [] previous_row_predictions;
