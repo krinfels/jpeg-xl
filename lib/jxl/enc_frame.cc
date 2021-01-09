@@ -743,11 +743,10 @@ class LossyFrameEncoder {
     dc_counts[1].resize(2048);
     dc_counts[2].resize(2048);
     size_t total_dc[3] = {};
-    float* JXL_RESTRICT previous_row_predictions =
-        new float[64 * kGroupDimInBlocks];
-    float* JXL_RESTRICT current_row_predictions =
-        new float[64 * kGroupDimInBlocks];
-    memset(current_row_predictions, 0, 64);
+    int* JXL_RESTRICT previous_row_predictions =
+        new int[64 * kGroupDimInBlocks];
+    int* JXL_RESTRICT current_row_predictions =
+        new int[64 * kGroupDimInBlocks];
 
     for (size_t c : {1, 0, 2}) {
       if (jpeg_data.components.size() == 1 && c != 1) {
@@ -763,6 +762,7 @@ class LossyFrameEncoder {
       ImageSB& map = (c == 0 ? shared.cmap.ytox_map : shared.cmap.ytob_map);
       for (size_t group_index = 0; group_index < frame_dim.num_groups;
            group_index++) {
+        memset(current_row_predictions, 0, 64 * sizeof(int));
         const size_t gx = group_index % frame_dim.xsize_groups;
         const size_t gy = group_index / frame_dim.xsize_groups;
         size_t offset = 0;
@@ -823,7 +823,7 @@ class LossyFrameEncoder {
             }
 #ifdef DEBUG
             if (c == 1) {
-              std::cout << offset / 64 << "th block (c=" << c
+              std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c
                         << ", values):\n";
               for (size_t y = 0; y < 8; y++) {
                 for (size_t x = 0; x < 8; x++) {
@@ -835,7 +835,7 @@ class LossyFrameEncoder {
 #endif
             const float* top_ac = by > gy*kGroupDimInBlocks ? ac + offset - row_size * 64 : nullptr;
             const float* left_ac = bx > gx*kGroupDimInBlocks ? ac + offset - 64 : nullptr;
-            float* const predictions = current_row_predictions + (bx - gx*kGroupDimInBlocks) * 64;
+            int* predictions = current_row_predictions + (bx - gx*kGroupDimInBlocks) * 64;
             individual_project::predict(predictions, top_ac, left_ac, false);
             offset += 64;
           }

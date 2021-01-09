@@ -1,7 +1,8 @@
 #include <cstddef>
 namespace individual_project {
 
-void predict(float* ac, const float* top_ac, const float* left_ac,
+template<typename T>
+void predict(T* ac, const float* top_ac, const float* left_ac,
              bool inplace) {
   if (top_ac == nullptr && left_ac == nullptr) {
     return;
@@ -14,7 +15,7 @@ void predict(float* ac, const float* top_ac, const float* left_ac,
       }
 
       const size_t idx = y * 8 + x;
-      float prediction;
+      int prediction;
 
       if (left_ac == nullptr) {
         prediction = top_ac[idx];
@@ -33,7 +34,10 @@ void predict(float* ac, const float* top_ac, const float* left_ac,
   }
 }
 
-void applyPrediction(float* ac, const float* predictions, size_t row_size) {
+template void predict<float>(float *, const float *, const float *, bool);
+template void predict<int>(int*, const float*, const float *, bool);
+
+void applyPrediction(float* ac, const int* predictions, size_t row_size) {
   const size_t INDEX_BOUND = 8;
   for (size_t i = 0; i < row_size; i++) {
     for (size_t y = 0; y < INDEX_BOUND; y++) {
