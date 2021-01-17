@@ -836,7 +836,7 @@ class LossyFrameEncoder {
             const float* top_ac = by > gy*kGroupDimInBlocks ? ac + offset - row_size * 64 : nullptr;
             const float* left_ac = bx > gx*kGroupDimInBlocks ? ac + offset - 64 : nullptr;
             int* predictions = current_row_predictions + (bx - gx*kGroupDimInBlocks) * 64;
-            individual_project::predict(predictions, top_ac, left_ac, false);
+            individual_project::predict(predictions, top_ac, left_ac, c, false);
             offset += 64;
           }
           if (by > gy * kGroupDimInBlocks) {

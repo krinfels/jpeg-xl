@@ -4,7 +4,7 @@
 namespace individual_project {
 
 template<typename T>
-void predict(T* ac, const float* top_ac, const float* left_ac,
+void predict(T* ac, const float* top_ac, const float* left_ac, int c,
              bool inplace);
 
 void applyPrediction(float* ac, const int* predictions, size_t row_size);

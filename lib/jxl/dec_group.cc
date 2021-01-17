@@ -269,7 +269,7 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
           float* left_ac = bx > 0 ? row + offset + (c - 3) * 64 : nullptr;
           float* top_ac = by > 0 ? prev_row + offset + (c * 64) : nullptr;
           individual_project::predict(row + offset + (c * 64), top_ac, left_ac,
-                                      true);
+                                      c, true);
 #ifdef DEBUG
           if (c == 1) {
             std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c

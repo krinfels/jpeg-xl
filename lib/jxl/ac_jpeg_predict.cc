@@ -1,55 +1,81 @@
 #include <cstddef>
+#include <cassert>
+#include <numeric>
+#include <utility>
 namespace individual_project {
 
+const float coeffs[3][4][16] = {
+{
+{0.473301558, -0.531856359, 0.555971595, -0.478261552, 0.399550622, -0.320526214, 0.456216623, -0.280618072, 0.476766073, -0.537249807, 0.520801425, -0.267008706, 0.446641113, -0.185678224, 0.094811196, 0.008948956},
+{0.030199915, -0.117800825, 0.097944366, -0.114931613, 0.141605248, -0.051558048, 0.083776176, -0.030650486, 0.620781270, -0.543564924, 0.539782582, -0.440985012, 0.440114742, -0.414446244, 0.332769247, -0.278203280},
+{0.580997065, -0.311170491, 0.524041079, -0.344990376, 0.451151822, -0.309587928, 0.221014030, -0.043735258, 0.030471573, -0.103222982, 0.066549067, -0.092621390, 0.060397003, -0.097234750, 0.007860561, 0.032346697},
+{0.103743005, -0.239676592, 0.200646905, -0.173244773, 0.188693777, -0.223920132, 0.222089860, -0.095981229, 0.103011377, -0.180976230, 0.156759913, -0.182920000, 0.188509649, -0.210807053, 0.141775760, 0.017627916},
+},
+{
+{0.402890084, -0.417102198, 0.540380999, -0.356335012, 0.491346126, -0.011576963, 0.399863173, 0.036294660, 0.553620289, -0.639502827, 0.645125217, -0.300009355, 0.345997561, -0.140499520, 0.086145351, -0.152435652},
+{0.034534706, -0.206111056, 0.054550128, -0.125823626, 0.062035092, -0.183943401, -0.032353134, -0.008515966, 0.548374628, -0.428726728, 0.474666200, -0.376993301, 0.314200806, -0.281221624, 0.507241339, -0.089096355},
+{0.447743298, -0.300457498, 0.344160275, -0.242514231, 0.361610723, -0.190653439, -0.010706363, -0.006928674, 0.038049231, -0.118791338, 0.062669532, -0.114686868, 0.091753250, -0.115219805, 0.104509786, -0.060478188},
+{0.125978539, -0.204072620, 0.189832921, -0.150478264, 0.076869154, -0.211516059, -0.020162132, 0.009574930, 0.113814997, -0.197480716, 0.148132718, -0.145378032, 0.092844871, -0.123283838, 0.065813538, -0.077650290},
+},
+{
+{0.437883465, -0.489955862, 0.628293024, -0.470957801, 0.550076251, -0.249776285, 0.498500484, -0.290394651, 0.518161634, -0.647530630, 0.709900789, -0.342594724, 0.463267762, -0.087161751, -0.075110902, 0.078150611},
+{0.025472395, -0.194844830, 0.063991934, -0.132236525, 0.097735000, -0.195876686, -0.058834318, -0.133623543, 0.501294504, -0.449012179, 0.490096393, -0.323816763, 0.323358606, -0.282179585, 0.279725700, -0.049387992},
+{0.431675692, -0.348461322, 0.449115685, -0.378052127, 0.374327344, -0.435871239, 0.331466880, -0.303484374, 0.025195744, -0.129355091, 0.017295870, -0.116859296, 0.066667737, -0.046296997, -0.028719421, -0.074123364},
+{0.159596157, -0.208666386, 0.189612868, -0.195018804, 0.064830753, -0.228337720, 0.205493700, -0.045738375, 0.125631505, -0.193582495, 0.230262133, -0.188918557, 0.221534965, -0.120605883, 0.196218023, -0.010965420},
+},
+};
+
+static const std::pair<int, int> coords[] = {std::make_pair(0, 1), std::make_pair(1, 0), std::make_pair(1, 1)};
+
 template<typename T>
-void predict(T* ac, const float* top_ac, const float* left_ac,
-             bool inplace) {
+void predict(T* ac, const float* top_ac, const float* left_ac, int c, bool inplace) {
+
   if (top_ac == nullptr && left_ac == nullptr) {
     return;
   }
 
-  for (size_t y = 0; y < 8; y++) {
-    for (size_t x = 0; x < 8; x++) {
-      if (x == 0 && y == 0) {
-        continue;
-      }
+  for (auto pos : coords) {
+    const size_t idx = 8 * pos.second + pos.first;
+    size_t offset;
+    float prediction = 0;
 
-      const size_t idx = y * 8 + x;
-      int prediction;
-
-      if (left_ac == nullptr) {
-        prediction = top_ac[idx];
-      } else if (top_ac == nullptr) {
-        prediction = left_ac[idx];
-      } else {
-        prediction = (top_ac[idx] + left_ac[idx]) / 2;
-      }
-
-      if (inplace) {
-        ac[idx] += prediction;
-      } else {
-        ac[idx] = prediction;
+    if (left_ac != nullptr) {
+      offset = 8 * pos.second;
+      for (int i = 0; i < 8; i++) {
+        assert(offset + i < 64);
+        if (offset + i == 0)
+          continue;
+        prediction += coeffs[c][2 * pos.second + pos.first][i] * left_ac[offset + i];
       }
     }
+
+    if (top_ac != nullptr) {
+      offset = pos.first;
+      for (int i = 0; i < 8; i++) {
+        if (offset + i == 0)
+          continue;
+        assert(offset + 8*i < 64);
+        prediction += coeffs[c][2 * pos.second + pos.first][8 + i] * top_ac[8*i + offset];
+      }
+    }
+
+    if (inplace) {
+      ac[idx] += prediction;
+    } else
+      ac[idx] = prediction;
   }
 }
 
-template void predict<float>(float *, const float *, const float *, bool);
-template void predict<int>(int*, const float*, const float *, bool);
+template void predict<float>(float *, const float *, const float *, int, bool);
+template void predict<int>(int*, const float*, const float *, int, bool);
 
 void applyPrediction(float* ac, const int* predictions, size_t row_size) {
-  const size_t INDEX_BOUND = 8;
+
   for (size_t i = 0; i < row_size; i++) {
-    for (size_t y = 0; y < INDEX_BOUND; y++) {
-      for (size_t x = 0; x < INDEX_BOUND; x++) {
-        if (x == 0 && y == 0) {
-          continue;
-        }
-        const size_t idx = y * 8 + x;
-        ac[64 * i + idx] -= predictions[64 * i + idx];
-      }
+    for (auto pos : coords) {
+      const size_t idx = 8 * pos.second + pos.first;
+      ac[64 * i + idx] -= predictions[64 * i + idx];
     }
   }
 }
-
 }
