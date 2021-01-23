@@ -270,22 +270,6 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
           float* top_ac = by > 0 ? prev_row + offset + (c * 64) : nullptr;
           individual_project::predict(row + offset + (c * 64), top_ac, left_ac,
                                       c, true);
-#ifdef DEBUG
-          if (c == 1) {
-            std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c
-                      << ", values):\n";
-            for (size_t y = 0; y < 8; y++) {
-              for (size_t x = 0; x < 8; x++) {
-                if (x == 0 && y == 0) {
-                  std::cout << std::setw(8) << dc_rows[c][sbx[c]] - dcoff[c];
-                } else {
-                  std::cout << std::setw(8) << row[offset + c * 64 + y * 8 + x];
-                }
-                if (x == 7) std::cout << std::endl;
-              }
-            }
-          }
-#endif
         }
 
         if (JXL_UNLIKELY(decoded->IsJPEG())) {

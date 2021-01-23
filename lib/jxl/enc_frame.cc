@@ -821,18 +821,6 @@ class LossyFrameEncoder {
                 }
               }
             }
-#ifdef DEBUG
-            if (c == 1) {
-              std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c
-                        << ", values):\n";
-              for (size_t y = 0; y < 8; y++) {
-                for (size_t x = 0; x < 8; x++) {
-                  std::cout << std::setw(8) << ac[offset + y * 8 + x];
-                  if (x == 7) std::cout << std::endl;
-                }
-              }
-            }
-#endif
             const float* top_ac = by > gy*kGroupDimInBlocks ? ac + offset - row_size * 64 : nullptr;
             const float* left_ac = bx > gx*kGroupDimInBlocks ? ac + offset - 64 : nullptr;
             int* predictions = current_row_predictions + (bx - gx*kGroupDimInBlocks) * 64;
@@ -852,10 +840,6 @@ class LossyFrameEncoder {
     }
     delete [] previous_row_predictions;
     delete [] current_row_predictions;
-
-    if (!frame_header->chroma_subsampling.Is444()) {
-      std::cout << "chroma_subsampling is on!" << std::endl;
-    }
 
     auto& dct = enc_state_->shared.block_ctx_map.dc_thresholds;
     auto& num_dc_ctxs = enc_state_->shared.block_ctx_map.num_dc_ctxs;
