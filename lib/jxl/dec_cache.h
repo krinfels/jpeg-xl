@@ -161,7 +161,8 @@ struct PassesDecoderState {
 // Temp images required for decoding a single group. Reduces memory allocations
 // for large images because we only initialize min(#threads, #groups) instances.
 struct GroupDecCache {
-  void InitOnce(size_t num_passes) {
+  void InitOnce(size_t num_passes, size_t xsize_blocks,
+                ACType type) { // todo (@mkondratek): remove unused param
     PROFILER_FUNC;
 
     for (size_t i = 0; i < num_passes; i++) {
@@ -173,15 +174,41 @@ struct GroupDecCache {
         num_nzeroes[i] = Image3I(kGroupDimInBlocks, kGroupDimInBlocks);
       }
     }
+
+    if (type == ACType::k16) {
+      dec_group_qrow16 =
+          (int16_t*)aligned_alloc(hwy::kMaxVectorSize,
+              sizeof(int16_t) * 3 * AcStrategy::kMaxCoeffArea * xsize_blocks);
+      prev_dec_group_qrow16 =
+          (int16_t*)aligned_alloc(hwy::kMaxVectorSize,
+              sizeof(int16_t) * 3 * AcStrategy::kMaxCoeffArea * xsize_blocks);
+    } else {
+      dec_group_qrow =
+          (int32_t*)aligned_alloc(hwy::kMaxVectorSize,
+              sizeof(int32_t) * 3 * AcStrategy::kMaxCoeffArea * xsize_blocks);
+      prev_dec_group_qrow =
+          (int32_t*)aligned_alloc(hwy::kMaxVectorSize,
+              sizeof(int32_t) * 3 * AcStrategy::kMaxCoeffArea * xsize_blocks);
+    }
+  }
+
+  void DeInit( ACType type) {
+    if (type == ACType::k16) {
+	    free(dec_group_qrow16);
+	    free(prev_dec_group_qrow16);
+    } else {
+	    free(dec_group_qrow);
+	    free(prev_dec_group_qrow);
+    }
   }
 
   // Scratch space used by DecGroupImpl().
   // TODO(veluca): figure out if we can use unions here.
   HWY_ALIGN_MAX float dec_group_block[3 * AcStrategy::kMaxCoeffArea];
-  union {
-    HWY_ALIGN_MAX int32_t dec_group_qblock[3 * AcStrategy::kMaxCoeffArea];
-    HWY_ALIGN_MAX int16_t dec_group_qblock16[3 * AcStrategy::kMaxCoeffArea];
-  };
+  HWY_ALIGN_MAX int32_t* dec_group_qrow;
+  HWY_ALIGN_MAX int32_t* prev_dec_group_qrow;
+  HWY_ALIGN_MAX int16_t* dec_group_qrow16;
+  HWY_ALIGN_MAX int16_t* prev_dec_group_qrow16;
   // For TransformToPixels.
   HWY_ALIGN_MAX float scratch_space[2 * AcStrategy::kMaxCoeffArea];
 
