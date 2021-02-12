@@ -27,7 +27,10 @@
 #define HWY_TARGET_INCLUDE "lib/jxl/dec_group.cc"
 #include <hwy/foreach_target.h>
 #include <hwy/highway.h>
+#include <iomanip>
+#include <iostream>
 
+#include "ac_jpeg_predict.h"
 #include "lib/jxl/ac_context.h"
 #include "lib/jxl/ac_strategy.h"
 #include "lib/jxl/aux_out.h"
@@ -240,8 +243,12 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
              block_rect.xsize() >> hshift[i], block_rect.ysize() >> vshift[i]);
   }
 
+  ACPtr qblock[3], prev_qblock[3];
   for (size_t by = 0; by < ysize_blocks; ++by) {
     get_block->StartRow(by);
+
+    size_t offsett = 0;
+
     size_t sby[3] = {by >> vshift[0], by >> vshift[1], by >> vshift[2]};
 
     const int32_t* JXL_RESTRICT row_quant =
@@ -303,7 +310,6 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
         const size_t covered_blocks = 1 << log2_covered_blocks;
         const size_t size = covered_blocks * kDCTBlockSize;
 
-        ACPtr qblock[3];
         if (accumulate) {
           for (size_t c = 0; c < 3; c++) {
             qblock[c] = dec_state->coefficients->PlaneRow(c, group_idx, offset);
@@ -325,7 +331,43 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
         }
         JXL_RETURN_IF_ERROR(get_block->LoadBlock(
             bx, by, acs, size, log2_covered_blocks, qblock, ac_type));
-        offset += size;
+        offset += size;//todo move after loop
+
+        for (int c : {1, 0, 2}) {
+          if (ac_type == ACType::k16) {
+            auto left_ac = bx > 0 ? qblock[c].ptr16 + offsett - 64 : nullptr;
+            auto top_ac = by > 0 ? prev_qblock[c].ptr16 + offsett : nullptr;
+            individual_project::predict(qblock[c].ptr16 + offsett, top_ac, left_ac,
+                                        c, true);
+          } else {
+            auto left_ac = bx > 0 ? qblock[c].ptr32 + offsett - 64 : nullptr;
+            auto top_ac = by > 0 ? prev_qblock[c].ptr32 + offsett : nullptr;
+            individual_project::predict(qblock[c].ptr32 + offsett, top_ac, left_ac,
+                                        c, true);
+          }
+
+#define DEBUG
+#ifdef DEBUG
+          if (c == 1) {
+            std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c
+                      << ", values):\n";
+            for (size_t y = 0; y < 8; y++) {
+              for (size_t x = 0; x < 8; x++) {
+                if (x == 0 && y == 0) {
+                  std::cout << std::setw(8) << dc_rows[c][sbx[c]] - dcoff[c];
+                } else {
+                  if (ac_type == ACType::k16) {
+                    std::cout << std::setw(8) << qblock[c].ptr16[offsett + y * 8 + x];
+                    } else {
+                    std::cout << std::setw(8) << qblock[c].ptr32[offsett + y * 8 + x];
+                    }
+                }
+                if (x == 7) std::cout << std::endl;
+              }
+            }
+          }
+#endif
+        }
 
         if (JXL_UNLIKELY(decoded->IsJPEG())) {
           if (acs.Strategy() != AcStrategy::Type::DCT) {
@@ -406,7 +448,14 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
           }
         }
         bx += llf_x;
+	offsett += size;
       }
+    }
+
+    if (ac_type == ACType::k16) {
+      std::swap(qblock, prev_qblock);
+    } else {
+      std::swap(qblock, prev_qblock);
     }
   }
   // Apply image features to
