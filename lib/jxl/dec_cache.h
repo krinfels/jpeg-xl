@@ -144,7 +144,7 @@ struct PassesDecoderState {
 // Temp images required for decoding a single group. Reduces memory allocations
 // for large images because we only initialize min(#threads, #groups) instances.
 struct GroupDecCache {
-  void InitOnce(size_t num_passes) {
+  void InitOnce(size_t num_passes, size_t xsize_blocks) {
     PROFILER_FUNC;
 
     for (size_t i = 0; i < num_passes; i++) {
@@ -156,6 +156,14 @@ struct GroupDecCache {
         num_nzeroes[i] = Image3I(kGroupDimInBlocks, kGroupDimInBlocks);
       }
     }
+
+    dec_group_row[0] = new float[3 * AcStrategy::kMaxCoeffArea * xsize_blocks];
+    dec_group_row[1] = new float[3 * AcStrategy::kMaxCoeffArea * xsize_blocks];
+  }
+
+  void DeInit() {
+    delete[] dec_group_row[0];
+    delete[] dec_group_row[1];
   }
 
   // Scratch space used by DecGroupImpl().
@@ -167,6 +175,8 @@ struct GroupDecCache {
   };
   // For TransformToPixels.
   HWY_ALIGN_MAX float scratch_space[2 * AcStrategy::kMaxCoeffArea];
+
+  float* dec_group_row[2];
 
   // AC decoding
   Image3I num_nzeroes[kMaxNumPasses];

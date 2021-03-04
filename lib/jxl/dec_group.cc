@@ -246,9 +246,6 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
   ACPtr qblock[3], prev_qblock[3];
   for (size_t by = 0; by < ysize_blocks; ++by) {
     get_block->StartRow(by);
-
-    size_t offsett = 0;
-
     size_t sby[3] = {by >> vshift[0], by >> vshift[1], by >> vshift[2]};
 
     const int32_t* JXL_RESTRICT row_quant =
@@ -295,6 +292,9 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
       // immediately continue (!IsFirstBlock). Reduces mispredictions.
       for (size_t bx = tx * kColorTileDimInBlocks;
            bx < xsize_blocks && bx < (tx + 1) * kColorTileDimInBlocks;) {
+
+        size_t offsett = 0;
+
         size_t sbx[3] = {bx >> hshift[0], bx >> hshift[1], bx >> hshift[2]};
         AcStrategy acs = acs_row[bx];
         const size_t llf_x = acs.covered_blocks_x();
@@ -452,11 +452,7 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
       }
     }
 
-    if (ac_type == ACType::k16) {
-      std::swap(qblock, prev_qblock);
-    } else {
-      std::swap(qblock, prev_qblock);
-    }
+    std::swap(qblock, prev_qblock);
   }
   // Apply image features to
   // - the whole AC group, if no loop filtering is enabled, or
@@ -732,20 +728,22 @@ Status DecodeGroup(BitReader* JXL_RESTRICT* JXL_RESTRICT readers,
                    AuxOut* aux_out) {
   PROFILER_FUNC;
 
-  group_dec_cache->InitOnce(num_passes);
+  const Rect& rect = dec_state->shared->BlockGroupRect(group_idx);
+
+  group_dec_cache->InitOnce(num_passes, rect.xsize());
 
   size_t histo_selector_bits =
       CeilLog2Nonzero(dec_state->shared->num_histograms);
 
   GetBlockFromBitstream get_block;
   JXL_RETURN_IF_ERROR(
-      get_block.Init(readers, num_passes, group_idx, histo_selector_bits,
-                     dec_state->shared->BlockGroupRect(group_idx),
+      get_block.Init(readers, num_passes, group_idx, histo_selector_bits, rect,
                      group_dec_cache, dec_state));
 
   JXL_RETURN_IF_ERROR(DecodeGroupImpl(&get_block, group_dec_cache, dec_state,
                                       thread, group_idx, aux_out, output,
                                       decoded));
+  group_dec_cache->DeInit();
 
   for (size_t pass = 0; pass < num_passes; pass++) {
     if (!get_block.decoders[pass].CheckANSFinalState()) {
