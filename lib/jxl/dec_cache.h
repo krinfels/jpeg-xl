@@ -144,7 +144,8 @@ struct PassesDecoderState {
 // Temp images required for decoding a single group. Reduces memory allocations
 // for large images because we only initialize min(#threads, #groups) instances.
 struct GroupDecCache {
-  void InitOnce(size_t num_passes, size_t xsize_blocks) {
+  void InitOnce(size_t num_passes, size_t xsize_blocks,
+                ACType type) { // todo (@mkondratek): remove unused param
     PROFILER_FUNC;
 
     for (size_t i = 0; i < num_passes; i++) {
@@ -157,26 +158,38 @@ struct GroupDecCache {
       }
     }
 
-    dec_group_row[0] = new float[3 * AcStrategy::kMaxCoeffArea * xsize_blocks];
-    dec_group_row[1] = new float[3 * AcStrategy::kMaxCoeffArea * xsize_blocks];
+    if (type == ACType::k16) {
+      dec_group_qrow16[0] =
+          new int16_t[3 * AcStrategy::kMaxCoeffArea * xsize_blocks]; // todo (@mkondratek): bring up variable
+      dec_group_qrow16[1] =
+          new int16_t[3 * AcStrategy::kMaxCoeffArea * xsize_blocks];
+    } else {
+      dec_group_qrow[0] =
+          new int32_t[3 * AcStrategy::kMaxCoeffArea * xsize_blocks];
+      dec_group_qrow[1] =
+          new int32_t[3 * AcStrategy::kMaxCoeffArea * xsize_blocks];
+    }
   }
 
-  void DeInit() {
-    delete[] dec_group_row[0];
-    delete[] dec_group_row[1];
+  void DeInit( ACType type) {
+    if (type == ACType::k16) {
+      delete[] dec_group_qrow16[0];
+      delete[] dec_group_qrow16[1];
+    } else {
+      delete[] dec_group_qrow[0];
+      delete[] dec_group_qrow[1];
+    }
   }
 
   // Scratch space used by DecGroupImpl().
   // TODO(veluca): figure out if we can use unions here.
   HWY_ALIGN_MAX float dec_group_block[3 * AcStrategy::kMaxCoeffArea];
   union {
-    HWY_ALIGN_MAX int32_t dec_group_qblock[3 * AcStrategy::kMaxCoeffArea];
-    HWY_ALIGN_MAX int16_t dec_group_qblock16[3 * AcStrategy::kMaxCoeffArea];
+    HWY_ALIGN_MAX int32_t* dec_group_qrow[2];
+    HWY_ALIGN_MAX int16_t* dec_group_qrow16[2];
   };
   // For TransformToPixels.
   HWY_ALIGN_MAX float scratch_space[2 * AcStrategy::kMaxCoeffArea];
-
-  float* dec_group_row[2];
 
   // AC decoding
   Image3I num_nzeroes[kMaxNumPasses];

@@ -246,6 +246,9 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
   ACPtr qblock[3], prev_qblock[3];
   for (size_t by = 0; by < ysize_blocks; ++by) {
     get_block->StartRow(by);
+
+    size_t offsett = 0;
+
     size_t sby[3] = {by >> vshift[0], by >> vshift[1], by >> vshift[2]};
 
     const int32_t* JXL_RESTRICT row_quant =
@@ -292,9 +295,6 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
       // immediately continue (!IsFirstBlock). Reduces mispredictions.
       for (size_t bx = tx * kColorTileDimInBlocks;
            bx < xsize_blocks && bx < (tx + 1) * kColorTileDimInBlocks;) {
-
-        size_t offsett = 0;
-
         size_t sbx[3] = {bx >> hshift[0], bx >> hshift[1], bx >> hshift[2]};
         AcStrategy acs = acs_row[bx];
         const size_t llf_x = acs.covered_blocks_x();
@@ -316,16 +316,16 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
           }
         } else {
           if (ac_type == ACType::k16) {
-            memset(group_dec_cache->dec_group_qblock16, 0,
+            memset(group_dec_cache->dec_group_qrow16[0] + (3 * offsett), 0,
                    size * 3 * sizeof(int16_t));
             for (size_t c = 0; c < 3; c++) {
-              qblock[c].ptr16 = group_dec_cache->dec_group_qblock16 + c * size;
+              qblock[c].ptr16 = group_dec_cache->dec_group_qrow16[0] + (3 * offsett) + c * size;
             }
           } else {
-            memset(group_dec_cache->dec_group_qblock, 0,
+            memset(group_dec_cache->dec_group_qrow[0] + (3 * offsett), 0,
                    size * 3 * sizeof(int32_t));
             for (size_t c = 0; c < 3; c++) {
-              qblock[c].ptr32 = group_dec_cache->dec_group_qblock + c * size;
+              qblock[c].ptr32 = group_dec_cache->dec_group_qrow[0] + (3 * offsett) + c * size;
             }
           }
         }
@@ -335,14 +335,14 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
 
         for (int c : {1, 0, 2}) {
           if (ac_type == ACType::k16) {
-            auto left_ac = bx > 0 ? qblock[c].ptr16 + offsett - 64 : nullptr;
-            auto top_ac = by > 0 ? prev_qblock[c].ptr16 + offsett : nullptr;
-            individual_project::predict(qblock[c].ptr16 + offsett, top_ac, left_ac,
+            auto left_ac = bx > 0 ? qblock[c].ptr16 - 3 * size : nullptr;
+            auto top_ac = by > 0 ? prev_qblock[c].ptr16 : nullptr;
+            individual_project::predict(qblock[c].ptr16, top_ac, left_ac,
                                         c, true);
           } else {
-            auto left_ac = bx > 0 ? qblock[c].ptr32 + offsett - 64 : nullptr;
-            auto top_ac = by > 0 ? prev_qblock[c].ptr32 + offsett : nullptr;
-            individual_project::predict(qblock[c].ptr32 + offsett, top_ac, left_ac,
+            auto left_ac = bx > 0 ? qblock[c].ptr32 - 3 * size : nullptr;
+            auto top_ac = by > 0 ? prev_qblock[c].ptr32 : nullptr;
+            individual_project::predict(qblock[c].ptr32, top_ac, left_ac,
                                         c, true);
           }
 
@@ -357,9 +357,9 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
                   std::cout << std::setw(8) << dc_rows[c][sbx[c]] - dcoff[c];
                 } else {
                   if (ac_type == ACType::k16) {
-                    std::cout << std::setw(8) << qblock[c].ptr16[offsett + y * 8 + x];
+                    std::cout << std::setw(8) << qblock[c].ptr16[y * 8 + x];
                     } else {
-                    std::cout << std::setw(8) << qblock[c].ptr32[offsett + y * 8 + x];
+                    std::cout << std::setw(8) << qblock[c].ptr32[y * 8 + x];
                     }
                 }
                 if (x == 7) std::cout << std::endl;
@@ -453,6 +453,11 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
     }
 
     std::swap(qblock, prev_qblock);
+    if (ac_type == ACType::k16) {
+      std::swap(group_dec_cache->dec_group_qrow[0], group_dec_cache->dec_group_qrow[1]);
+    } else {
+      std::swap(group_dec_cache->dec_group_qrow16[0], group_dec_cache->dec_group_qrow16[1]);
+    }
   }
   // Apply image features to
   // - the whole AC group, if no loop filtering is enabled, or
@@ -730,7 +735,8 @@ Status DecodeGroup(BitReader* JXL_RESTRICT* JXL_RESTRICT readers,
 
   const Rect& rect = dec_state->shared->BlockGroupRect(group_idx);
 
-  group_dec_cache->InitOnce(num_passes, rect.xsize());
+  ACType ac_type = dec_state->coefficients->Type();
+  group_dec_cache->InitOnce(num_passes, rect.xsize(), ac_type);
 
   size_t histo_selector_bits =
       CeilLog2Nonzero(dec_state->shared->num_histograms);
@@ -743,7 +749,7 @@ Status DecodeGroup(BitReader* JXL_RESTRICT* JXL_RESTRICT readers,
   JXL_RETURN_IF_ERROR(DecodeGroupImpl(&get_block, group_dec_cache, dec_state,
                                       thread, group_idx, aux_out, output,
                                       decoded));
-  group_dec_cache->DeInit();
+  group_dec_cache->DeInit(ac_type);
 
   for (size_t pass = 0; pass < num_passes; pass++) {
     if (!get_block.decoders[pass].CheckANSFinalState()) {
