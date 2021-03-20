@@ -335,12 +335,12 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
 
         for (int c : {1, 0, 2}) {
           if (ac_type == ACType::k16) {
-            auto left_ac = bx > 0 ? qblock[c].ptr16 - 3 * size : nullptr;
+            auto left_ac = bx > 0 && tx > 0? qblock[c].ptr16 - 3 * size : nullptr;
             auto top_ac = by > 0 ? prev_qblock[c].ptr16 : nullptr;
             individual_project::predict(qblock[c].ptr16, top_ac, left_ac,
                                         c, true);
           } else {
-            auto left_ac = bx > 0 ? qblock[c].ptr32 - 3 * size : nullptr;
+            auto left_ac = bx > 0 && tx > 0 ? qblock[c].ptr32 - 3 * size : nullptr;
             auto top_ac = by > 0 ? prev_qblock[c].ptr32 : nullptr;
             individual_project::predict(qblock[c].ptr32, top_ac, left_ac,
                                         c, true);
