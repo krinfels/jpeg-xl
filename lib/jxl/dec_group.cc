@@ -243,7 +243,7 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
              block_rect.xsize() >> hshift[i], block_rect.ysize() >> vshift[i]);
   }
 
-  ACPtr qblock[3], prev_qblock[3];
+  ACPtr qblock[3];
   for (size_t by = 0; by < ysize_blocks; ++by) {
     get_block->StartRow(by);
 
@@ -316,16 +316,16 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
           }
         } else {
           if (ac_type == ACType::k16) {
-            memset(group_dec_cache->dec_group_qrow16[0] + (3 * offsett), 0,
+            memset(group_dec_cache->dec_group_qrow16 + (3 * offsett), 0,
                    size * 3 * sizeof(int16_t));
             for (size_t c = 0; c < 3; c++) {
-              qblock[c].ptr16 = group_dec_cache->dec_group_qrow16[0] + (3 * offsett) + c * size;
+              qblock[c].ptr16 = group_dec_cache->dec_group_qrow16 + (3 * offsett) + c * size;
             }
           } else {
-            memset(group_dec_cache->dec_group_qrow[0] + (3 * offsett), 0,
+            memset(group_dec_cache->dec_group_qrow + (3 * offsett), 0,
                    size * 3 * sizeof(int32_t));
             for (size_t c = 0; c < 3; c++) {
-              qblock[c].ptr32 = group_dec_cache->dec_group_qrow[0] + (3 * offsett) + c * size;
+              qblock[c].ptr32 = group_dec_cache->dec_group_qrow + (3 * offsett) + c * size;
             }
           }
         }
@@ -335,13 +335,13 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
 
         for (int c : {1, 0, 2}) {
           if (ac_type == ACType::k16) {
-            auto left_ac = bx > 0 && tx > 0? qblock[c].ptr16 - 3 * size : nullptr;
-            auto top_ac = by > 0 ? prev_qblock[c].ptr16 : nullptr;
+            auto left_ac = bx > 0 ? qblock[c].ptr16 - 3 * size : nullptr;
+            auto top_ac = by > 0 ? group_dec_cache->prev_dec_group_qrow16 + (3 * offsett) + (c * 64) : nullptr;
             individual_project::predict(qblock[c].ptr16, top_ac, left_ac,
                                         c, true);
           } else {
-            auto left_ac = bx > 0 && tx > 0 ? qblock[c].ptr32 - 3 * size : nullptr;
-            auto top_ac = by > 0 ? prev_qblock[c].ptr32 : nullptr;
+            auto left_ac = bx > 0 ? qblock[c].ptr32 - 3 * size : nullptr;
+            auto top_ac = by > 0 ? group_dec_cache->prev_dec_group_qrow + (3 * offsett) + (c * 64) : nullptr;
             individual_project::predict(qblock[c].ptr32, top_ac, left_ac,
                                         c, true);
           }
@@ -349,7 +349,7 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
 #define DEBUG
 #ifdef DEBUG
           if (c == 1) {
-            std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c
+            std::cout << "by=" << by << " block (c=" << c
                       << ", values):\n";
             for (size_t y = 0; y < 8; y++) {
               for (size_t x = 0; x < 8; x++) {
@@ -452,11 +452,10 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
       }
     }
 
-    std::swap(qblock, prev_qblock);
     if (ac_type == ACType::k16) {
-      std::swap(group_dec_cache->dec_group_qrow[0], group_dec_cache->dec_group_qrow[1]);
+      std::swap(group_dec_cache->dec_group_qrow16, group_dec_cache->prev_dec_group_qrow16);
     } else {
-      std::swap(group_dec_cache->dec_group_qrow16[0], group_dec_cache->dec_group_qrow16[1]);
+      std::swap(group_dec_cache->dec_group_qrow, group_dec_cache->prev_dec_group_qrow);
     }
   }
   // Apply image features to

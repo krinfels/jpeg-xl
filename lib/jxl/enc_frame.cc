@@ -823,7 +823,7 @@ class LossyFrameEncoder {
 #define DEBUG
 #ifdef DEBUG
             if (c == 1) {
-              std::cout << "(bx=" << bx << ", by=" << by << ") block (c=" << c
+              std::cout << "by=" << by << " block (c=" << c
                         << ", values):\n";
               for (size_t y = 0; y < 8; y++) {
                 for (size_t x = 0; x < 8; x++) {
