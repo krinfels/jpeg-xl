@@ -160,24 +160,28 @@ struct GroupDecCache {
 
     if (type == ACType::k16) {
       dec_group_qrow16[0] =
-          new int16_t[3 * AcStrategy::kMaxCoeffArea * xsize_blocks]; // todo (@mkondratek): bring up variable
+          (int16_t*)aligned_alloc(hwy::kMaxVectorSize,
+              sizeof(int16_t) * 3 * AcStrategy::kMaxCoeffArea * xsize_blocks);
       dec_group_qrow16[1] =
-          new int16_t[3 * AcStrategy::kMaxCoeffArea * xsize_blocks];
+          (int16_t*)aligned_alloc(hwy::kMaxVectorSize,
+              sizeof(int16_t) * 3 * AcStrategy::kMaxCoeffArea * xsize_blocks);
     } else {
       dec_group_qrow[0] =
-          new int32_t[3 * AcStrategy::kMaxCoeffArea * xsize_blocks];
+          (int32_t*)aligned_alloc(hwy::kMaxVectorSize,
+              sizeof(int32_t) * 3 * AcStrategy::kMaxCoeffArea * xsize_blocks);
       dec_group_qrow[1] =
-          new int32_t[3 * AcStrategy::kMaxCoeffArea * xsize_blocks];
+          (int32_t*)aligned_alloc(hwy::kMaxVectorSize,
+              sizeof(int32_t) * 3 * AcStrategy::kMaxCoeffArea * xsize_blocks);
     }
   }
 
   void DeInit( ACType type) {
     if (type == ACType::k16) {
-      delete[] dec_group_qrow16[0];
-      delete[] dec_group_qrow16[1];
+	    free(dec_group_qrow16[0]);
+	    free(dec_group_qrow16[1]);
     } else {
-      delete[] dec_group_qrow[0];
-      delete[] dec_group_qrow[1];
+	    free(dec_group_qrow[0]);
+	    free(dec_group_qrow[1]);
     }
   }
 
