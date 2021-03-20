@@ -63,15 +63,23 @@ const float coeffs[3][4][16] = {
 static const std::pair<int, int> coords[] = {
     std::make_pair(0, 1), std::make_pair(1, 0), std::make_pair(1, 1)};
 
+int mapIndex(int x, int y, bool is_transposed) {
+  if (is_transposed) {
+    return 8 * x + y;
+  } else {
+    return 8 * y + x;
+  }
+}
+
 template <typename T>
 void predict(T* ac, const T* top_ac, const T* left_ac, int c,
-             bool inplace) {
+             bool inplace, bool is_transposed) {
   if (top_ac == nullptr && left_ac == nullptr) {
     return;
   }
 
   for (auto pos : coords) {
-    const size_t idx = 8 * pos.second + pos.first;
+    const size_t idx = mapIndex(pos.first, pos.second, is_transposed);
     size_t offset;
     float prediction = 0;
 
@@ -81,7 +89,7 @@ void predict(T* ac, const T* top_ac, const T* left_ac, int c,
         assert(offset + i < 64);
         if (offset + i == 0) continue;
         prediction +=
-            coeffs[c][2 * pos.second + pos.first][i] * left_ac[offset + i];
+            coeffs[c][2 * pos.second + pos.first][i] * left_ac[mapIndex(i, pos.second, is_transposed)];
       }
     }
 
@@ -91,19 +99,20 @@ void predict(T* ac, const T* top_ac, const T* left_ac, int c,
         if (offset + i == 0) continue;
         assert(offset + 8 * i < 64);
         prediction += coeffs[c][2 * pos.second + pos.first][8 + i] *
-                      top_ac[8 * i + offset];
+                      top_ac[mapIndex(pos.first, i, is_transposed)];
       }
     }
 
     if (inplace) {
       ac[idx] += static_cast<T>(prediction);
-    } else
+    } else {
       ac[idx] = static_cast<T>(prediction);
+    }
   }
 }
 
-template void predict<int32_t>(int32_t*, const int32_t*, const int32_t*, int, bool);
-template void predict<int16_t>(int16_t*, const int16_t*, const int16_t*, int, bool);
+template void predict<int32_t>(int32_t*, const int32_t*, const int32_t*, int, bool, bool);
+template void predict<int16_t>(int16_t*, const int16_t*, const int16_t*, int, bool, bool);
 
 void applyPrediction(int32_t* ac, const int32_t* predictions, size_t row_size) {
   for (size_t i = 0; i < row_size; i++) {

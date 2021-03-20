@@ -842,7 +842,7 @@ class LossyFrameEncoder {
                                        : nullptr;
             int32_t* JXL_RESTRICT predictions =
                 current_row_predictions + (bx - gx * kGroupDimInBlocks) * 64;
-            individual_project::predict(predictions, top_ac, left_ac, c, false);
+            individual_project::predict(predictions, top_ac, left_ac, c, false, false);
             offset += 64;
           }
           if (by > gy * kGroupDimInBlocks) {

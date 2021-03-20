@@ -333,42 +333,6 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
             bx, by, acs, size, log2_covered_blocks, qblock, ac_type));
         offset += size;//todo move after loop
 
-        for (int c : {1, 0, 2}) {
-          if (ac_type == ACType::k16) {
-            auto left_ac = bx > 0 ? qblock[c].ptr16 - 3 * size : nullptr;
-            auto top_ac = by > 0 ? group_dec_cache->prev_dec_group_qrow16 + (3 * offsett) + (c * 64) : nullptr;
-            individual_project::predict(qblock[c].ptr16, top_ac, left_ac,
-                                        c, true);
-          } else {
-            auto left_ac = bx > 0 ? qblock[c].ptr32 - 3 * size : nullptr;
-            auto top_ac = by > 0 ? group_dec_cache->prev_dec_group_qrow + (3 * offsett) + (c * 64) : nullptr;
-            individual_project::predict(qblock[c].ptr32, top_ac, left_ac,
-                                        c, true);
-          }
-
-#define DEBUG
-#ifdef DEBUG
-          if (c == 1) {
-            std::cout << "by=" << by << " block (c=" << c
-                      << ", values):\n";
-            for (size_t y = 0; y < 8; y++) {
-              for (size_t x = 0; x < 8; x++) {
-                if (x == 0 && y == 0) {
-                  std::cout << std::setw(8) << dc_rows[c][sbx[c]] - dcoff[c];
-                } else {
-                  if (ac_type == ACType::k16) {
-                    std::cout << std::setw(8) << qblock[c].ptr16[y * 8 + x];
-                    } else {
-                    std::cout << std::setw(8) << qblock[c].ptr32[y * 8 + x];
-                    }
-                }
-                if (x == 7) std::cout << std::endl;
-              }
-            }
-          }
-#endif
-        }
-
         if (JXL_UNLIKELY(decoded->IsJPEG())) {
           if (acs.Strategy() != AcStrategy::Type::DCT) {
             return JXL_FAILURE(
@@ -391,6 +355,48 @@ Status DecodeGroupImpl(GetBlock* JXL_RESTRICT get_block,
             // No CfL - no need to store the y block converted to integers.
             if (!cs.Is444() ||
                 (row_cmap[0][abs_tx] == 0 && row_cmap[2][abs_tx] == 0)) {
+
+
+              if (ac_type == ACType::k16) {
+                auto left_ac = bx > 0 ? qblock[c].ptr16 - 3 * size : nullptr;
+                auto top_ac = by > 0
+                              ? group_dec_cache->prev_dec_group_qrow16 +
+                                (3 * offsett) + (c * 64) : nullptr;
+                individual_project::predict(qblock[c].ptr16, top_ac, left_ac,
+                                            c, true, true);
+              } else {
+                auto left_ac = bx > 0 ? qblock[c].ptr32 - 3 * size : nullptr;
+                auto top_ac = by > 0 ? group_dec_cache->prev_dec_group_qrow +
+                                       (3 * offsett) + (c * 64) : nullptr;
+                individual_project::predict(qblock[c].ptr32, top_ac, left_ac,
+                                            c, true, true);
+              }
+
+#define DEBUG
+#ifdef DEBUG
+              if (c == 1) {
+                std::cout << "by=" << by << " block (c=" << c
+                          << ", values):\n";
+                for (size_t x = 0; x < 8; x++) {
+                  for (size_t y = 0; y < 8; y++) {
+                    if (x == 0 && y == 0) {
+                      std::cout << std::setw(8)
+                                << dc_rows[c][sbx[c]] - dcoff[c];
+                    } else {
+                      if (ac_type == ACType::k16) {
+                        std::cout << std::setw(8)
+                                  << qblock[c].ptr16[y * 8 + x];
+                      } else {
+                        std::cout << std::setw(8)
+                                  << qblock[c].ptr32[y * 8 + x];
+                      }
+                    }
+                    if (y == 7) std::cout << std::endl;
+                  }
+                }
+              }
+#endif
+
               for (size_t i = 0; i < 64; i += Lanes(d)) {
                 const auto ini = Load(di, transposed_dct + i);
                 const auto ini16 = DemoteTo(di16, ini);
